@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: arena-oauth-proxy
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: CLIENT_SECRET
+        sync: false
+      - key: NODE_ENV
+        value: production

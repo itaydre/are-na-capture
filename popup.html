@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Are.na Element Capture</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Are.na Capture</h1>
+    </header>
+
+    <!-- Authentication Section -->
+    <div id="auth-section" class="section hidden">
+      <p class="auth-message">Please authenticate with Are.na to continue.</p>
+      <button id="login-btn" class="btn btn-primary">Login to Are.na</button>
+      <div id="auth-error" class="error-message hidden"></div>
+    </div>
+
+    <!-- Main Content Section -->
+    <div id="main-section" class="section hidden">
+      <!-- Capture Status -->
+      <div id="capture-status" class="status-message">
+        <p>Click "Start Capture" to begin selecting elements on the current page.</p>
+      </div>
+
+      <!-- Start Capture Button -->
+      <button id="start-capture-btn" class="btn btn-primary btn-block">Start Capture</button>
+
+      <!-- Captured Image Preview -->
+      <div id="preview-section" class="preview-section hidden">
+        <h3>Captured Element</h3>
+        <div class="image-preview">
+          <img id="preview-image" src="" alt="Captured element">
+        </div>
+      </div>
+
+      <!-- Channel Selection -->
+      <div id="channel-section" class="channel-section hidden">
+        <div class="search-container">
+          <input 
+            type="text" 
+            id="channel-search" 
+            class="search-input" 
+            placeholder="Type to search..."
+            autocomplete="off"
+          />
+        </div>
+        <div class="channels-container">
+          <div id="channels-header" class="channels-header">Recent channels</div>
+          <ul id="channel-list" class="channel-list">
+            <li class="channel-item loading-item">
+              <span>Loading channels...</span>
+            </li>
+          </ul>
+        </div>
+        <div id="channel-loading" class="loading hidden">Loading channels...</div>
+        <div id="channel-error" class="error-message hidden"></div>
+      </div>
+
+      <!-- Upload Button -->
+      <button id="upload-btn" class="btn btn-success btn-block hidden" disabled>Upload to Are.na</button>
+
+      <!-- Loading Indicator -->
+      <div id="upload-loading" class="loading hidden">
+        <div class="spinner"></div>
+        <span>Uploading...</span>
+      </div>
+
+      <!-- Success/Error Messages -->
+      <div id="message" class="message hidden"></div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading-section" class="section">
+      <div class="loading">
+        <div class="spinner"></div>
+        <span>Loading...</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

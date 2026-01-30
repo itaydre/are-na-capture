@@ -1,0 +1,29 @@
+{
+  "name": "are-na-capture-proxy",
+  "version": "1.0.0",
+  "description": "Backend proxy server for Are.na OAuth token exchange",
+  "main": "proxy-server.js",
+  "scripts": {
+    "start": "node proxy-server.js",
+    "dev": "nodemon proxy-server.js"
+  },
+  "keywords": [
+    "are-na",
+    "oauth",
+    "proxy"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

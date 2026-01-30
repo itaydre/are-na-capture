@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Create Icons</title>
+</head>
+<body>
+<h1>Icon Generator</h1>
+<p>Open this file in a browser, then right-click each canvas and "Save image as..."</p>
+<canvas id="icon16" width="16" height="16"></canvas> icon16.png<br>
+<canvas id="icon48" width="48" height="48"></canvas> icon48.png<br>
+<canvas id="icon128" width="128" height="128"></canvas> icon128.png<br>
+<script>
+const color = '#4A90E2';
+[16, 48, 128].forEach(size => {
+  const canvas = document.getElementById(`icon${size}`);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = 'white';
+  ctx.font = `bold ${size * 0.6}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('A', size/2, size/2);
+});
+</script>
+</body>
+</html>
