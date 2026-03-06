@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Are.na Element Capture",
+  "name": "div to are.na",
   "version": "1.0.0",
   "description": "Capture any HTML element from web pages and upload it to your Are.na channels",
   "permissions": [
@@ -14,7 +14,8 @@
   "host_permissions": [
     "https://api.are.na/*",
     "https://www.are.na/*",
-    "http://localhost:3000/*",
+    "https://are-na-capture.vercel.app/*",
+    "https://s3.amazonaws.com/*",
     "https://api.imgur.com/*"
   ],
   "background": {

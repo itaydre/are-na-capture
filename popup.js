@@ -3,6 +3,7 @@
 let capturedImageDataUrl = null;
 let capturedSourceUrl = null;
 let channels = [];
+let displayedChannels = []; // Currently displayed list (may differ from channels during search)
 let allChannelsLoaded = false;
 let selectedChannelSlug = null;
 let isAuthenticated = false;
@@ -26,6 +27,7 @@ const uploadLoading = document.getElementById('upload-loading');
 const messageDiv = document.getElementById('message');
 const authError = document.getElementById('auth-error');
 const captureStatus = document.getElementById('capture-status');
+const resetCaptureBtn = document.getElementById('reset-capture-btn');
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
@@ -116,6 +118,7 @@ function setupEventListeners() {
   loginBtn.addEventListener('click', handleLogin);
   startCaptureBtn.addEventListener('click', handleStartCapture);
   uploadBtn.addEventListener('click', handleUpload);
+  resetCaptureBtn.addEventListener('click', handleResetCapture);
   
   // Search input event listener
   if (channelSearch) {
@@ -180,24 +183,45 @@ async function handleStartCapture() {
   }
 }
 
+// Handle reset capture
+function handleResetCapture() {
+  // Clear captured image data
+  capturedImageDataUrl = null;
+  capturedSourceUrl = null;
+  selectedChannelSlug = null;
+
+  // Clear stored capture from storage
+  chrome.storage.local.remove(['capturedImage', 'capturedElementInfo', 'capturedSourceUrl', 'captureTimestamp']);
+
+  // Hide preview section
+  previewSection.classList.add('hidden');
+  previewImage.src = '';
+
+  // Hide channel section
+  channelSection.classList.add('hidden');
+
+  // Update upload button state
+  updateUploadButton();
+
+  // Reset status message
+  captureStatus.innerHTML = '<p>Click the camera icon to capture elements from the current page.</p>';
+}
+
 // Handle element captured
 function handleElementCaptured(imageDataUrl, elementInfo, sourceUrl) {
   capturedImageDataUrl = imageDataUrl;
   capturedSourceUrl = sourceUrl || null;
-  
+
   // Show preview
   previewImage.src = imageDataUrl;
   previewSection.classList.remove('hidden');
-  
+
   // Show channel selection
   channelSection.classList.remove('hidden');
-  
-  // Enable upload button if channel is selected
-  if (selectedChannelSlug) {
-    uploadBtn.classList.remove('hidden');
-    uploadBtn.disabled = false;
-  }
-  
+
+  // Update upload button state
+  updateUploadButton();
+
   // Update status
   captureStatus.innerHTML = `<p>Element captured! Select a channel and upload.</p>`;
 }
@@ -267,9 +291,10 @@ async function loadChannels(fetchAll = false) {
     
     if (response && response.success && response.channels) {
       channels = response.channels;
+      displayedChannels = channels;
       allChannelsLoaded = fetchAll;
       console.log('Loaded channels:', channels.length, 'allChannelsLoaded:', allChannelsLoaded);
-      renderChannelList(channels);
+      renderChannelList(displayedChannels);
     } else {
       const errorMsg = response?.error || 'Failed to load channels';
       console.error('Channel loading error:', errorMsg);
@@ -286,57 +311,83 @@ async function loadChannels(fetchAll = false) {
   }
 }
 
+// Debounce helper
+let searchTimeout = null;
+
 // Handle channel search input
 async function handleChannelSearch(event) {
-  const searchTerm = event.target.value.toLowerCase().trim();
-  
-  // If user starts typing and we haven't loaded all channels yet, fetch them now
-  if (searchTerm && !allChannelsLoaded) {
-    console.log('User started searching, fetching all channels...');
-    channelList.innerHTML = '<li class="channel-item loading-item"><span>Loading all channels...</span></li>';
-    
+  const searchTerm = event.target.value.trim();
+
+  if (!searchTerm) {
+    // Show recent channels when search is cleared
+    displayedChannels = channels;
+    renderChannelList(displayedChannels);
+    if (channelsHeader) channelsHeader.textContent = 'Recent channels';
+    return;
+  }
+
+  // Debounce search
+  if (searchTimeout) clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(async () => {
+    if (channelsHeader) channelsHeader.textContent = 'Searching...';
+
+    // Try server-side search first (v3 API)
     try {
       const response = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ action: 'getChannels', fetchAll: true }, (response) => {
+        chrome.runtime.sendMessage({ action: 'searchChannels', query: searchTerm }, (response) => {
           if (chrome.runtime.lastError) {
             reject(new Error(chrome.runtime.lastError.message));
-            return;
-          }
-          if (!response) {
-            reject(new Error('No response from background script'));
             return;
           }
           resolve(response);
         });
       });
-      
+
       if (response && response.success && response.channels) {
-        channels = response.channels;
-        allChannelsLoaded = true;
-        console.log('Loaded all channels for search:', channels.length);
+        displayedChannels = response.channels;
+        renderChannelList(displayedChannels);
+        if (channelsHeader) channelsHeader.textContent = 'Search results';
+        return;
       }
     } catch (error) {
-      console.error('Error loading all channels for search:', error);
-      return; // Continue with current channels if fetch fails
+      console.log('Server search failed, falling back to local filter');
     }
-  }
-  
-  // Filter channels based on search term
-  let filteredChannels = channels;
-  if (searchTerm) {
-    filteredChannels = channels.filter(channel => {
+
+    // Fallback: load all channels and filter locally
+    if (!allChannelsLoaded) {
+      channelList.innerHTML = '<li class="channel-item loading-item"><span>Loading all channels...</span></li>';
+      try {
+        const response = await new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage({ action: 'getChannels', fetchAll: true }, (response) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+              return;
+            }
+            resolve(response);
+          });
+        });
+
+        if (response && response.success && response.channels) {
+          channels = response.channels;
+          allChannelsLoaded = true;
+        }
+      } catch (error) {
+        console.error('Error loading channels for search:', error);
+        return;
+      }
+    }
+
+    const term = searchTerm.toLowerCase();
+    const filteredChannels = channels.filter(channel => {
       const title = (channel.title || '').toLowerCase();
       const slug = (channel.slug || '').toLowerCase();
-      return title.includes(searchTerm) || slug.includes(searchTerm);
+      return title.includes(term) || slug.includes(term);
     });
-  }
-  
-  renderChannelList(filteredChannels);
-  
-  // Update header based on search
-  if (channelsHeader) {
-    channelsHeader.textContent = searchTerm ? 'Search results' : 'Recent channels';
-  }
+
+    displayedChannels = filteredChannels;
+    renderChannelList(displayedChannels);
+    if (channelsHeader) channelsHeader.textContent = 'Search results';
+  }, 300);
 }
 
 // Render channel list
@@ -351,26 +402,44 @@ function renderChannelList(channelsList) {
   channelsList.forEach(channel => {
     const li = document.createElement('li');
     li.className = 'channel-item';
+    li.setAttribute('role', 'button');
+    li.setAttribute('tabindex', '0');
     if (selectedChannelSlug === channel.slug) {
       li.classList.add('selected');
+      li.setAttribute('aria-pressed', 'true');
+    } else {
+      li.setAttribute('aria-pressed', 'false');
     }
-    
+
     // Get channel count (number of blocks) - API might return length or length_
     const count = channel.length !== undefined ? channel.length : (channel.length_ !== undefined ? channel.length_ : 0);
-    
+
     // Get channel owner
     const ownerName = channel.user ? (channel.user.username || channel.user.slug || channel.user.name || '') : '';
-    
+
+    // Get channel status (public, closed, private)
+    const status = channel.status || 'public';
+    const statusLabel = status === 'public' ? 'Open' : status.charAt(0).toUpperCase() + status.slice(1);
+
     li.innerHTML = `
+      <span class="channel-status channel-status-${status}" aria-hidden="true"></span>
+      <span class="visually-hidden">${statusLabel} channel:</span>
       <span class="channel-name">${channel.title || channel.slug}</span>
       <span class="channel-count">${count}</span>
       <span class="channel-owner">${ownerName || ''}</span>
     `;
-    
+
     li.addEventListener('click', () => {
       selectChannel(channel.slug);
     });
-    
+
+    li.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        selectChannel(channel.slug);
+      }
+    });
+
     channelList.appendChild(li);
   });
 }
@@ -378,24 +447,21 @@ function renderChannelList(channelsList) {
 // Select a channel
 function selectChannel(slug) {
   selectedChannelSlug = slug;
-  
-  // Re-render list to update selection
-  const searchTerm = channelSearch ? channelSearch.value.toLowerCase().trim() : '';
-  let filteredChannels = channels;
-  if (searchTerm) {
-    filteredChannels = channels.filter(channel => {
-      const title = (channel.title || '').toLowerCase();
-      const slug_lower = (channel.slug || '').toLowerCase();
-      return title.includes(searchTerm) || slug_lower.includes(searchTerm);
-    });
-  }
-  renderChannelList(filteredChannels);
-  
-  // Enable upload button if image is captured
+
+  // Re-render the currently displayed list to update selection highlight
+  renderChannelList(displayedChannels);
+
+  // Update upload button visibility
+  updateUploadButton();
+}
+
+// Update upload button state
+function updateUploadButton() {
   if (selectedChannelSlug && capturedImageDataUrl) {
     uploadBtn.classList.remove('hidden');
     uploadBtn.disabled = false;
   } else {
+    uploadBtn.classList.add('hidden');
     uploadBtn.disabled = true;
   }
 }
@@ -440,7 +506,7 @@ async function handleUpload() {
         previewSection.classList.add('hidden');
         channelSection.classList.add('hidden');
         uploadBtn.classList.add('hidden');
-        captureStatus.innerHTML = '<p>Click "Start Capture" to begin selecting elements on the current page.</p>';
+        captureStatus.innerHTML = '<p>Click the camera icon to capture elements from the current page.</p>';
       }, 2000);
     } else {
       throw new Error(response.error || 'Upload failed');

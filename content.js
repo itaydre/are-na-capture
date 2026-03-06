@@ -40,8 +40,6 @@ function startCaptureMode() {
   document.addEventListener('click', handleClick, true);
   document.addEventListener('keydown', handleKeyDown, true);
 
-  // Visual feedback
-  showNotification('Capture mode active. Hover over elements and click to select. Press ESC to cancel.');
 }
 
 function stopCaptureMode() {
@@ -114,19 +112,16 @@ function handleKeyDown(e) {
   
   if (e.key === 'Escape') {
     stopCaptureMode();
-    showNotification('Capture mode cancelled.');
   }
 }
 
 async function captureElement(element) {
   try {
-    showNotification('Capturing element...');
-    
     // Get element position and dimensions
     const rect = element.getBoundingClientRect();
     const scrollX = window.scrollX || window.pageXOffset;
     const scrollY = window.scrollY || window.pageYOffset;
-    
+
     const elementInfo = {
       x: rect.left + scrollX,
       y: rect.top + scrollY,
@@ -136,25 +131,39 @@ async function captureElement(element) {
       className: element.className,
       id: element.id
     };
-    
-    // Stop capture mode first
+
+    // Remove overlay completely before capture
+    if (overlay) {
+      overlay.remove();
+      overlay = null;
+    }
+
+    // Force a repaint and wait for it to complete
+    document.body.offsetHeight;
+    await new Promise(resolve => requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setTimeout(resolve, 100);
+      });
+    }));
+
+    // Stop capture mode (cleans up event listeners)
     stopCaptureMode();
-    
+
     // Ask background script to capture using Chrome's native screenshot API
     chrome.runtime.sendMessage({
       action: 'captureElement',
       elementInfo: elementInfo
     }, (response) => {
       if (chrome.runtime.lastError) {
-        showNotification('Error: ' + chrome.runtime.lastError.message);
+        console.error('Capture error:', chrome.runtime.lastError.message);
         return;
       }
-      
+
       if (response && response.error) {
-        showNotification('Error: ' + response.error);
+        console.error('Capture error:', response.error);
         return;
       }
-      
+
       if (response && response.imageDataUrl) {
         console.log('Storing captured image, data URL length:', response.imageDataUrl.length);
         
@@ -187,79 +196,13 @@ async function captureElement(element) {
           // Popup might be closed, that's okay - it will check storage on open
           console.log('Popup is closed, image stored for later');
         });
-        
-        showNotification('Element captured! Open the extension popup to upload.');
       } else {
-        showNotification('Error: No image received');
+        console.error('Capture error: No image received');
       }
     });
   } catch (error) {
     console.error('Error capturing element:', error);
-    showNotification('Error capturing element. Please try again.');
     stopCaptureMode();
   }
 }
 
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = src;
-    script.onload = resolve;
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
-}
-
-function showNotification(message) {
-  // Remove existing notification
-  const existing = document.getElementById('arena-capture-notification');
-  if (existing) {
-    existing.remove();
-  }
-  
-  // Create notification
-  const notification = document.createElement('div');
-  notification.id = 'arena-capture-notification';
-  notification.textContent = message;
-  notification.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: #4A90E2;
-    color: white;
-    padding: 12px 20px;
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    z-index: 1000000;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 14px;
-    max-width: 300px;
-    animation: slideIn 0.3s ease-out;
-  `;
-  
-  // Add animation
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes slideIn {
-      from {
-        transform: translateX(100%);
-        opacity: 0;
-      }
-      to {
-        transform: translateX(0);
-        opacity: 1;
-      }
-    }
-  `;
-  document.head.appendChild(style);
-  
-  document.body.appendChild(notification);
-  
-  // Auto-remove after 3 seconds
-  setTimeout(() => {
-    if (notification.parentNode) {
-      notification.style.animation = 'slideIn 0.3s ease-out reverse';
-      setTimeout(() => notification.remove(), 300);
-    }
-  }, 3000);
-}

@@ -24,3 +24,5 @@ Thumbs.db
 # Never commit client secrets
 CLIENT_SECRET
 *.secret
+.vercel
+.mcp.json
