@@ -12,6 +12,10 @@
       "dest": "/api/exchange-token.js"
     },
     {
+      "src": "/ping",
+      "dest": "/api/ping.js"
+    },
+    {
       "src": "/health",
       "dest": "/api/health.js"
     },

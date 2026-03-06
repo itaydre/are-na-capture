@@ -12,12 +12,24 @@ let isAuthenticating = false;
 let authPromise = null;
 
 // Initialize context menu on install
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   chrome.contextMenus.create({
     id: 'capture-element',
     title: 'Capture Element to Are.na',
     contexts: ['page', 'selection']
   });
+
+  // Track install/update
+  if (details.reason === 'install' || details.reason === 'update') {
+    fetch(`${PROXY_SERVER_URL}/ping`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: details.reason,
+        extensionId: chrome.runtime.id
+      })
+    }).catch(() => {});
+  }
 });
 
 // Handle context menu clicks
