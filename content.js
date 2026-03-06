@@ -550,8 +550,7 @@ const DROPDOWN_CSS = `
     display: flex;
     align-items: center;
     justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
   }
 
   .arena-status-group {
@@ -699,7 +698,7 @@ function showInlineDropdown(imageDataUrl, sourceUrl) {
             <span class="arena-channel-dot private"></span> Private
           </button>
         </div>
-        <div class="arena-create-actions">
+        <div class="arena-create-actions" style="margin-left:auto;">
           <button class="arena-cancel-btn">Cancel</button>
           <button class="arena-create-btn">Create</button>
         </div>

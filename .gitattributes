@@ -1,0 +1,10 @@
+# Exclude dev/server files from GitHub zip download
+api/ export-ignore
+vercel.json export-ignore
+icons/arena-logo.svg export-ignore
+icons/create_icons.sh export-ignore
+icons/create_simple_icons.html export-ignore
+icons/ICONS_README.txt export-ignore
+icons/.DS_Store export-ignore
+.mcp.json export-ignore
+.gitattributes export-ignore

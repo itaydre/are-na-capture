@@ -382,6 +382,8 @@ header h1 {
 .create-channel-actions {
   display: flex;
   gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .btn-cancel {
