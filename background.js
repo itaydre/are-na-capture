@@ -607,19 +607,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     captureElementScreenshot(sender.tab.id, request.elementInfo)
       .then(async (dataUrl) => {
         sendResponse({ success: true, imageDataUrl: dataUrl });
-
-        setTimeout(async () => {
-          try {
-            chrome.action.openPopup();
-          } catch (error) {
-            chrome.windows.create({
-              url: chrome.runtime.getURL('popup.html'),
-              type: 'popup',
-              width: 520,
-              height: 700
-            });
-          }
-        }, 100);
+        // The inline dropdown in content.js handles channel selection now
       })
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;
