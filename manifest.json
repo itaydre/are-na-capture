@@ -1,5 +1,6 @@
 {
   "manifest_version": 3,
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoYjwtZyaL7UDUYtGm7FqVC73A9KyDvdkYHTwzVYZHyj/GnMw3vINEQNtlgCh1O+dKsg8m/Ou0TLsjz3WjyOC2Emio2Tzv+HFYkJun485CEfX+vUobUZABRwrG0BaEGPVTsYp74ogyndNeEH80FTLGT17dVQm1D+wt+XfujXAs2ilTnwyUkOOLBZhOnaYMshZ3QdxyzIdoktRhwKAwRPZ16mI5yMfp/MIz5NygtQgWa9B22fKdw1CBi1Raa4IWznr+wDJBq4KY2E3u5s2+cahrdQ6XnJ9AiNyNurYFO5c/cA+ltqKUSD6Xy6TclMROUdHWF/2/1bvEPq0EBPs0ZvhNQIDAQAB",
   "name": "div to are.na",
   "version": "1.0.0",
   "description": "Capture any HTML element from web pages and upload it to your Are.na channels",
