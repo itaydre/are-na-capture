@@ -5,6 +5,7 @@ let selectedElement = null;
 let overlay = null;
 let dropdownHost = null;
 let clickPosition = null;
+let selectedChannel = null;
 
 // Listen for messages from background/popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -208,13 +209,13 @@ const DROPDOWN_CSS = `
   .arena-dropdown {
     position: fixed;
     z-index: 2147483647;
-    width: 280px;
+    width: 300px;
     background: #fff;
     border-radius: 8px;
     box-shadow: 0 8px 30px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     color: #333;
-    overflow: hidden;
+    overflow: visible;
     animation: arena-drop-in 0.15s ease-out;
   }
 
@@ -320,6 +321,10 @@ const DROPDOWN_CSS = `
     background: #f5f5f5;
   }
 
+  .arena-channel-item.selected {
+    background: #e8f4f8;
+  }
+
   .arena-channel-dot {
     width: 7px;
     height: 7px;
@@ -399,6 +404,59 @@ const DROPDOWN_CSS = `
   .arena-upload-status.error {
     color: #ff4d4f;
     background: #fff2f0;
+  }
+
+  .arena-connect-footer {
+    padding: 8px 12px 10px;
+    border-top: 1px solid #eee;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .arena-title-input {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 13px;
+    font-family: inherit;
+    color: #333;
+    background: #fafafa;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .arena-title-input::placeholder {
+    color: #aaa;
+  }
+
+  .arena-title-input:focus {
+    border-color: #4A90E2;
+    background: #fff;
+    box-shadow: 0 0 0 2px rgba(74,144,226,0.15);
+  }
+
+  .arena-connect-btn {
+    width: 100%;
+    padding: 8px 14px;
+    background: #333;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .arena-connect-btn:hover {
+    background: #000;
+  }
+
+  .arena-connect-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   .arena-not-authed {
@@ -483,6 +541,8 @@ const DROPDOWN_CSS = `
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
   }
 
   .arena-status-group {
@@ -581,28 +641,31 @@ function showInlineDropdown(imageDataUrl, sourceUrl) {
 
   // Position: place near click, but keep it on screen
   const pos = clickPosition || { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-  const dropdownWidth = 280;
-  const dropdownMaxHeight = 340;
+  const dropdownWidth = 300;
+  const margin = 12;
 
   let left = pos.x + 8;
-  let top = pos.y + 8;
 
-  // Keep within viewport
-  if (left + dropdownWidth > window.innerWidth - 12) {
+  // Keep within viewport horizontally
+  if (left + dropdownWidth > window.innerWidth - margin) {
     left = pos.x - dropdownWidth - 8;
   }
-  if (left < 12) left = 12;
-
-  if (top + dropdownMaxHeight > window.innerHeight - 12) {
-    top = pos.y - dropdownMaxHeight - 8;
-  }
-  if (top < 12) top = 12;
+  if (left < margin) left = margin;
 
   // Build dropdown
   const dropdown = document.createElement('div');
   dropdown.className = 'arena-dropdown';
   dropdown.style.left = left + 'px';
-  dropdown.style.top = top + 'px';
+
+  // If click is in the lower half, anchor dropdown bottom to click point
+  // Otherwise anchor top to click point
+  if (pos.y > window.innerHeight / 2) {
+    dropdown.style.bottom = (window.innerHeight - pos.y + 8) + 'px';
+    dropdown.style.maxHeight = (pos.y - 8 - margin) + 'px';
+    dropdown.style.overflowY = 'auto';
+  } else {
+    dropdown.style.top = (pos.y + 8) + 'px';
+  }
 
   dropdown.innerHTML = `
     <div class="arena-dropdown-header">
@@ -637,6 +700,10 @@ function showInlineDropdown(imageDataUrl, sourceUrl) {
       <button class="arena-new-btn">+ New</button>
     </div>
     <ul class="arena-channel-list"></ul>
+    <div class="arena-connect-footer" style="display:none;">
+      <input class="arena-title-input" type="text" placeholder="Block title (optional)" autocomplete="off" />
+      <button class="arena-connect-btn" disabled>Connect</button>
+    </div>
   `;
 
   shadow.appendChild(dropdown);
@@ -651,7 +718,11 @@ function showInlineDropdown(imageDataUrl, sourceUrl) {
   const cancelBtn = shadow.querySelector('.arena-cancel-btn');
   const createBtn = shadow.querySelector('.arena-create-btn');
   const statusBtns = shadow.querySelectorAll('.arena-status-btn');
+  const connectFooter = shadow.querySelector('.arena-connect-footer');
+  const titleInput = shadow.querySelector('.arena-title-input');
+  const connectBtn = shadow.querySelector('.arena-connect-btn');
   let newChannelStatus = 'closed';
+  selectedChannel = null;
 
   // "+ New" button toggles the create form
   newBtn.addEventListener('click', () => {
@@ -696,8 +767,8 @@ function showInlineDropdown(imageDataUrl, sourceUrl) {
           createForm.style.display = 'none';
           newBtn.style.display = '';
 
-          // Upload to the new channel immediately
-          uploadFromDropdown(shadow, ch, imageDataUrl, sourceUrl);
+          // Select the new channel
+          selectChannelInDropdown(shadow, ch);
         } else {
           // Show error inline
           let statusEl = shadow.querySelector('.arena-upload-status');
@@ -718,6 +789,41 @@ function showInlineDropdown(imageDataUrl, sourceUrl) {
     if (e.key === 'Enter') {
       e.preventDefault();
       doCreateChannel();
+    }
+  });
+
+  // Select a channel helper
+  function selectChannelInDropdown(shadow, channel) {
+    selectedChannel = channel;
+    // Highlight selected item
+    shadow.querySelectorAll('.arena-channel-item').forEach(item => {
+      item.classList.remove('selected');
+    });
+    const items = shadow.querySelectorAll('.arena-channel-item');
+    items.forEach(item => {
+      const nameEl = item.querySelector('.arena-channel-name');
+      if (nameEl && nameEl.textContent === (channel.title || channel.slug)) {
+        item.classList.add('selected');
+      }
+    });
+    // Show connect footer
+    connectFooter.style.display = '';
+    connectBtn.disabled = false;
+    titleInput.focus();
+  }
+
+  // Connect button handler
+  connectBtn.addEventListener('click', () => {
+    if (!selectedChannel) return;
+    const title = titleInput.value.trim();
+    uploadFromDropdown(shadow, selectedChannel, imageDataUrl, sourceUrl, title);
+  });
+
+  titleInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && selectedChannel) {
+      e.preventDefault();
+      const title = titleInput.value.trim();
+      uploadFromDropdown(shadow, selectedChannel, imageDataUrl, sourceUrl, title);
     }
   });
 
@@ -848,25 +954,39 @@ function renderDropdownChannels(shadow, channels, imageDataUrl, sourceUrl) {
     const li = document.createElement('li');
     li.className = 'arena-channel-item';
 
-    const status = channel.status || 'public';
-    const count = channel.length !== undefined ? channel.length : (channel.length_ !== undefined ? channel.length_ : '');
+    const status = channel.status || channel.visibility || 'public';
+    const count = channel.length ?? channel.length_ ?? channel.counts?.contents ?? channel.counts?.blocks ?? null;
 
     li.innerHTML = `
       <span class="arena-channel-dot ${status}"></span>
       <span class="arena-channel-name">${channel.title || channel.slug}</span>
-      <span class="arena-channel-count">${count}</span>
+      ${count !== null ? `<span class="arena-channel-count">${count}</span>` : ''}
     `;
 
     li.addEventListener('click', () => {
-      uploadFromDropdown(shadow, channel, imageDataUrl, sourceUrl);
+      selectedChannel = channel;
+      // Update selection highlight
+      shadow.querySelectorAll('.arena-channel-item').forEach(item => item.classList.remove('selected'));
+      li.classList.add('selected');
+      // Show connect footer
+      const footer = shadow.querySelector('.arena-connect-footer');
+      footer.style.display = '';
+      const cBtn = shadow.querySelector('.arena-connect-btn');
+      cBtn.disabled = false;
+      const tInput = shadow.querySelector('.arena-title-input');
+      tInput.focus();
     });
 
     channelList.appendChild(li);
   });
 }
 
-function uploadFromDropdown(shadow, channel, imageDataUrl, sourceUrl) {
+function uploadFromDropdown(shadow, channel, imageDataUrl, sourceUrl, title) {
   const dropdown = shadow.querySelector('.arena-dropdown');
+
+  // Hide connect footer
+  const footer = shadow.querySelector('.arena-connect-footer');
+  if (footer) footer.style.display = 'none';
 
   // Show uploading state
   let statusEl = shadow.querySelector('.arena-upload-status');
@@ -888,7 +1008,8 @@ function uploadFromDropdown(shadow, channel, imageDataUrl, sourceUrl) {
     action: 'uploadBlock',
     channelSlug: channel.slug,
     imageDataUrl: imageDataUrl,
-    sourceUrl: sourceUrl
+    sourceUrl: sourceUrl,
+    title: title || undefined
   }, (resp) => {
     if (resp && resp.success) {
       statusEl.className = 'arena-upload-status success';
@@ -925,8 +1046,8 @@ function trackRecentChannel(channel) {
     recents.unshift({
       slug: channel.slug,
       title: channel.title || channel.slug,
-      status: channel.status || 'public',
-      length: channel.length || channel.length_ || 0
+      status: channel.status || channel.visibility || 'public',
+      length: channel.length ?? channel.length_ ?? channel.counts?.contents ?? channel.counts?.blocks ?? 0
     });
 
     // Keep max 10

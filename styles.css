@@ -511,8 +511,8 @@ header h1 {
 }
 
 .channel-count {
-  font-size: 14px;
-  color: #666;
+  font-size: 12px;
+  color: #999;
   font-weight: 400;
   flex-shrink: 0;
 }

@@ -448,22 +448,22 @@ function renderChannelList(channelsList) {
       li.setAttribute('aria-pressed', 'false');
     }
 
-    // Get channel count (number of blocks) - API might return length or length_
-    const count = channel.length !== undefined ? channel.length : (channel.length_ !== undefined ? channel.length_ : 0);
+    // Get channel count — v2 uses length, v3 uses counts.contents or counts.blocks
+    const count = channel.length ?? channel.length_ ?? channel.counts?.contents ?? channel.counts?.blocks ?? null;
 
     // Get channel owner
     const ownerName = channel.user ? (channel.user.username || channel.user.slug || channel.user.name || '') : '';
 
     // Get channel status (public, closed, private)
-    const status = channel.status || 'public';
+    const status = channel.status || channel.visibility || 'public';
     const statusLabel = status === 'public' ? 'Open' : status.charAt(0).toUpperCase() + status.slice(1);
 
     li.innerHTML = `
       <span class="channel-status channel-status-${status}" aria-hidden="true"></span>
       <span class="visually-hidden">${statusLabel} channel:</span>
       <span class="channel-name">${channel.title || channel.slug}</span>
-      <span class="channel-count">${count}</span>
-      <span class="channel-owner">${ownerName || ''}</span>
+      ${count !== null ? `<span class="channel-count">${count}</span>` : ''}
+      ${ownerName ? `<span class="channel-owner">${ownerName}</span>` : ''}
     `;
 
     li.addEventListener('click', () => {

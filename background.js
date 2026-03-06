@@ -469,7 +469,7 @@ async function uploadImageToImgur(imageDataUrl) {
 }
 
 // Upload block to channel — tries v3 presign first, falls back to v2 + Imgur
-async function uploadBlockToChannel(channelSlug, imageDataUrl, sourceUrl) {
+async function uploadBlockToChannel(channelSlug, imageDataUrl, sourceUrl, title) {
   const token = await getAccessToken();
 
   let imageUrl;
@@ -504,6 +504,9 @@ async function uploadBlockToChannel(channelSlug, imageDataUrl, sourceUrl) {
         value: imageUrl,
         channel_ids: [channelId]
       };
+      if (title) {
+        blockBody.title = title;
+      }
       if (sourceUrl) {
         blockBody.description = `Source: ${sourceUrl}`;
       }
@@ -529,6 +532,9 @@ async function uploadBlockToChannel(channelSlug, imageDataUrl, sourceUrl) {
   // Fallback: v2 channel blocks endpoint
   const formData = new FormData();
   formData.append('source', imageUrl);
+  if (title) {
+    formData.append('title', title);
+  }
   if (sourceUrl) {
     formData.append('description', `Source: ${sourceUrl}`);
   }
@@ -590,7 +596,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'uploadBlock') {
-    uploadBlockToChannel(request.channelSlug, request.imageDataUrl, request.sourceUrl)
+    uploadBlockToChannel(request.channelSlug, request.imageDataUrl, request.sourceUrl, request.title)
       .then(result => sendResponse({ success: true, result }))
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;
@@ -669,13 +675,13 @@ async function captureElementScreenshot(tabId, elementInfo) {
             const cropWidth = Math.min(elementInfo.width * dpr, img.width - cropX);
             const cropHeight = Math.min(elementInfo.height * dpr, img.height - cropY);
 
-            canvas.width = elementInfo.width;
-            canvas.height = elementInfo.height;
+            canvas.width = cropWidth;
+            canvas.height = cropHeight;
 
             ctx.drawImage(
               img,
               cropX, cropY, cropWidth, cropHeight,
-              0, 0, canvas.width, canvas.height
+              0, 0, cropWidth, cropHeight
             );
 
             resolve(canvas.toDataURL('image/png'));
