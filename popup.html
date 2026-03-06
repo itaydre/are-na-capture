@@ -61,8 +61,40 @@
             aria-label="Search channels"
           />
         </div>
+        <!-- Create Channel Form (hidden by default) -->
+        <div id="create-channel-form" class="create-channel-form hidden">
+          <input
+            type="text"
+            id="new-channel-title"
+            class="search-input"
+            placeholder="Channel name"
+            autocomplete="off"
+            aria-label="New channel name"
+          />
+          <div class="create-channel-options">
+            <div class="status-select">
+              <button type="button" class="status-option selected" data-status="closed" aria-pressed="true">
+                <span class="channel-status channel-status-closed" aria-hidden="true"></span> Closed
+              </button>
+              <button type="button" class="status-option" data-status="public" aria-pressed="false">
+                <span class="channel-status channel-status-public" aria-hidden="true"></span> Open
+              </button>
+              <button type="button" class="status-option" data-status="private" aria-pressed="false">
+                <span class="channel-status channel-status-private" aria-hidden="true"></span> Private
+              </button>
+            </div>
+            <div class="create-channel-actions">
+              <button id="cancel-create-channel" class="btn btn-cancel">Cancel</button>
+              <button id="confirm-create-channel" class="btn btn-primary">Create</button>
+            </div>
+          </div>
+        </div>
+
         <div class="channels-container">
-          <h2 id="channels-header" class="channels-header">Recent channels</h2>
+          <div class="channels-header-row">
+            <h2 id="channels-header" class="channels-header">Recent channels</h2>
+            <button id="new-channel-btn" class="btn-new-channel" aria-label="Create new channel">+ New</button>
+          </div>
           <ul id="channel-list" class="channel-list">
             <li class="channel-item loading-item">
               <span>Loading channels...</span>

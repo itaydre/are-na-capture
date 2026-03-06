@@ -325,12 +325,119 @@ header h1 {
   min-height: 0;
 }
 
+/* Create Channel */
+.create-channel-form {
+  padding: 12px 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #fafafa;
+}
+
+.create-channel-form .search-input {
+  margin-bottom: 10px;
+}
+
+.create-channel-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-select {
+  display: flex;
+  gap: 4px;
+}
+
+.status-option {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: white;
+  color: #666;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.status-option:hover {
+  border-color: #ccc;
+  background: #f5f5f5;
+}
+
+.status-option.selected {
+  border-color: #333;
+  color: #333;
+  background: #f0f0f0;
+}
+
+.status-option .channel-status {
+  width: 6px;
+  height: 6px;
+}
+
+.create-channel-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-cancel {
+  background: transparent;
+  color: #666;
+  border: 1px solid #e0e0e0;
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+.btn-cancel:hover {
+  background: #f5f5f5;
+  border-color: #ccc;
+}
+
+.create-channel-actions .btn-primary {
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+.channels-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background: white;
+}
+
+.btn-new-channel {
+  font-size: 12px;
+  font-family: inherit;
+  color: #4A90E2;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.btn-new-channel:hover {
+  background: #f0f0f0;
+}
+
+.btn-new-channel:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.5);
+}
+
 .channels-header {
   font-size: 14px;
   font-weight: 600;
   color: #333;
   padding: 16px 20px 12px 20px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: none;
   background: white;
   margin: 0;
 }

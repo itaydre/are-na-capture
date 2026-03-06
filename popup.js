@@ -28,6 +28,13 @@ const messageDiv = document.getElementById('message');
 const authError = document.getElementById('auth-error');
 const captureStatus = document.getElementById('capture-status');
 const resetCaptureBtn = document.getElementById('reset-capture-btn');
+const newChannelBtn = document.getElementById('new-channel-btn');
+const createChannelForm = document.getElementById('create-channel-form');
+const newChannelTitle = document.getElementById('new-channel-title');
+const cancelCreateChannel = document.getElementById('cancel-create-channel');
+const confirmCreateChannel = document.getElementById('confirm-create-channel');
+const statusOptions = document.querySelectorAll('.status-option');
+let newChannelStatus = 'closed';
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
@@ -124,6 +131,36 @@ function setupEventListeners() {
   if (channelSearch) {
     channelSearch.addEventListener('input', handleChannelSearch);
   }
+
+  // Create channel event listeners
+  if (newChannelBtn) {
+    newChannelBtn.addEventListener('click', showCreateChannelForm);
+  }
+  if (cancelCreateChannel) {
+    cancelCreateChannel.addEventListener('click', hideCreateChannelForm);
+  }
+  if (confirmCreateChannel) {
+    confirmCreateChannel.addEventListener('click', handleCreateChannel);
+  }
+  if (newChannelTitle) {
+    newChannelTitle.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleCreateChannel();
+      }
+    });
+  }
+  statusOptions.forEach(option => {
+    option.addEventListener('click', () => {
+      statusOptions.forEach(o => {
+        o.classList.remove('selected');
+        o.setAttribute('aria-pressed', 'false');
+      });
+      option.classList.add('selected');
+      option.setAttribute('aria-pressed', 'true');
+      newChannelStatus = option.dataset.status;
+    });
+  });
   
   // Listen for messages from content script
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -518,6 +555,80 @@ async function handleUpload() {
     uploadBtn.classList.remove('hidden');
   } finally {
     uploadLoading.classList.add('hidden');
+  }
+}
+
+// Show create channel form
+function showCreateChannelForm() {
+  createChannelForm.classList.remove('hidden');
+  newChannelTitle.value = '';
+  newChannelTitle.focus();
+  newChannelBtn.classList.add('hidden');
+}
+
+// Hide create channel form
+function hideCreateChannelForm() {
+  createChannelForm.classList.add('hidden');
+  newChannelTitle.value = '';
+  newChannelBtn.classList.remove('hidden');
+  // Reset status selection to default (closed)
+  statusOptions.forEach(o => {
+    o.classList.remove('selected');
+    o.setAttribute('aria-pressed', 'false');
+  });
+  const closedOption = document.querySelector('.status-option[data-status="closed"]');
+  if (closedOption) {
+    closedOption.classList.add('selected');
+    closedOption.setAttribute('aria-pressed', 'true');
+  }
+  newChannelStatus = 'closed';
+}
+
+// Handle create channel
+async function handleCreateChannel() {
+  const title = newChannelTitle.value.trim();
+  if (!title) {
+    showMessage('Please enter a channel name.', 'error');
+    return;
+  }
+
+  confirmCreateChannel.disabled = true;
+  confirmCreateChannel.textContent = 'Creating...';
+
+  try {
+    const response = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { action: 'createChannel', title, status: newChannelStatus },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          resolve(response);
+        }
+      );
+    });
+
+    if (response && response.success && response.channel) {
+      const newChannel = response.channel;
+      // Add new channel to the top of the list
+      channels.unshift(newChannel);
+      displayedChannels = channels;
+      // Auto-select the new channel
+      selectedChannelSlug = newChannel.slug;
+      renderChannelList(displayedChannels);
+      updateUploadButton();
+      hideCreateChannelForm();
+      showMessage(`Channel "${newChannel.title}" created!`, 'success');
+    } else {
+      throw new Error(response?.error || 'Failed to create channel');
+    }
+  } catch (error) {
+    console.error('Error creating channel:', error);
+    showMessage(error.message || 'Failed to create channel.', 'error');
+  } finally {
+    confirmCreateChannel.disabled = false;
+    confirmCreateChannel.textContent = 'Create';
   }
 }
 

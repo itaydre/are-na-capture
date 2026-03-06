@@ -313,6 +313,67 @@ async function searchChannels(query) {
   return null;
 }
 
+// Create a new channel
+async function createChannel(title, status = 'closed') {
+  const token = await getAccessToken();
+
+  // Try v3 first
+  try {
+    const response = await fetch(`${ARE_NA_API_BASE}/channels`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ title, status })
+    });
+
+    if (response.ok) {
+      return await response.json();
+    }
+
+    const errorText = await response.text();
+    if (response.status === 401) {
+      throw new Error('Authentication failed. Please log in again.');
+    }
+    if (response.status === 429 || errorText.includes('rate limited')) {
+      throw new Error('Rate limited: Please wait a few minutes and try again.');
+    }
+    console.log('v3 channel creation failed, trying v2');
+  } catch (error) {
+    if (error.message.includes('Authentication') || error.message.includes('Rate limited')) {
+      throw error;
+    }
+    console.log('v3 channel creation error, trying v2:', error.message);
+  }
+
+  // Fallback to v2
+  const response = await fetch('https://api.are.na/v2/channels', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ title, status })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = `Failed to create channel: ${response.statusText}`;
+    try {
+      const errorJson = JSON.parse(errorText);
+      errorMessage = errorJson.message || errorJson.error || errorMessage;
+    } catch (e) {
+      if (errorText && errorText.length < 500) {
+        errorMessage = errorText;
+      }
+    }
+    throw new Error(errorMessage);
+  }
+
+  return await response.json();
+}
+
 // Upload image using v3 presigned S3 upload (replaces Imgur)
 async function uploadImageToArena(imageDataUrl) {
   const token = await getAccessToken();
@@ -517,6 +578,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'searchChannels') {
     searchChannels(request.query)
       .then(channels => sendResponse({ success: true, channels }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  if (request.action === 'createChannel') {
+    createChannel(request.title, request.status)
+      .then(channel => sendResponse({ success: true, channel }))
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;
   }
