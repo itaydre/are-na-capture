@@ -424,6 +424,143 @@ const DROPDOWN_CSS = `
   .arena-auth-btn:hover {
     background: #000;
   }
+
+  /* Section header row with + New button */
+  .arena-section-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px 4px;
+  }
+
+  .arena-section-row .arena-section-label {
+    padding: 0;
+  }
+
+  .arena-new-btn {
+    font-size: 11px;
+    font-family: inherit;
+    color: #4A90E2;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background-color 0.15s;
+  }
+
+  .arena-new-btn:hover {
+    background: #f0f0f0;
+  }
+
+  /* Create channel form */
+  .arena-create-form {
+    padding: 8px 12px 10px;
+    border-bottom: 1px solid #eee;
+    background: #fafafa;
+  }
+
+  .arena-create-input {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 13px;
+    font-family: inherit;
+    color: #333;
+    background: #fff;
+    outline: none;
+    margin-bottom: 8px;
+    transition: border-color 0.15s;
+  }
+
+  .arena-create-input:focus {
+    border-color: #4A90E2;
+    box-shadow: 0 0 0 2px rgba(74,144,226,0.15);
+  }
+
+  .arena-create-options {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .arena-status-group {
+    display: flex;
+    gap: 3px;
+  }
+
+  .arena-status-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    background: #fff;
+    color: #888;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .arena-status-btn:hover {
+    border-color: #ccc;
+    background: #f5f5f5;
+  }
+
+  .arena-status-btn.selected {
+    border-color: #333;
+    color: #333;
+    background: #f0f0f0;
+  }
+
+  .arena-status-btn .arena-channel-dot {
+    width: 6px;
+    height: 6px;
+  }
+
+  .arena-create-actions {
+    display: flex;
+    gap: 4px;
+  }
+
+  .arena-cancel-btn {
+    padding: 4px 8px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    background: #fff;
+    color: #888;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .arena-cancel-btn:hover {
+    background: #f5f5f5;
+    border-color: #ccc;
+  }
+
+  .arena-create-btn {
+    padding: 4px 10px;
+    border: none;
+    border-radius: 4px;
+    background: #333;
+    color: #fff;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .arena-create-btn:hover {
+    background: #000;
+  }
+
+  .arena-create-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 function showInlineDropdown(imageDataUrl, sourceUrl) {
@@ -475,7 +612,30 @@ function showInlineDropdown(imageDataUrl, sourceUrl) {
     <div class="arena-search-container">
       <input class="arena-search-input" type="text" placeholder="Search channels..." autocomplete="off" />
     </div>
-    <div class="arena-section-label arena-recent-label">Recent</div>
+    <div class="arena-create-form" style="display:none;">
+      <input class="arena-create-input" type="text" placeholder="Channel name" autocomplete="off" />
+      <div class="arena-create-options">
+        <div class="arena-status-group">
+          <button type="button" class="arena-status-btn selected" data-status="closed">
+            <span class="arena-channel-dot closed"></span> Closed
+          </button>
+          <button type="button" class="arena-status-btn" data-status="public">
+            <span class="arena-channel-dot public"></span> Open
+          </button>
+          <button type="button" class="arena-status-btn" data-status="private">
+            <span class="arena-channel-dot private"></span> Private
+          </button>
+        </div>
+        <div class="arena-create-actions">
+          <button class="arena-cancel-btn">Cancel</button>
+          <button class="arena-create-btn">Create</button>
+        </div>
+      </div>
+    </div>
+    <div class="arena-section-row">
+      <span class="arena-section-label arena-recent-label">Recent</span>
+      <button class="arena-new-btn">+ New</button>
+    </div>
     <ul class="arena-channel-list"></ul>
   `;
 
@@ -485,6 +645,81 @@ function showInlineDropdown(imageDataUrl, sourceUrl) {
   const searchInput = shadow.querySelector('.arena-search-input');
   const channelList = shadow.querySelector('.arena-channel-list');
   const recentLabel = shadow.querySelector('.arena-recent-label');
+  const newBtn = shadow.querySelector('.arena-new-btn');
+  const createForm = shadow.querySelector('.arena-create-form');
+  const createInput = shadow.querySelector('.arena-create-input');
+  const cancelBtn = shadow.querySelector('.arena-cancel-btn');
+  const createBtn = shadow.querySelector('.arena-create-btn');
+  const statusBtns = shadow.querySelectorAll('.arena-status-btn');
+  let newChannelStatus = 'closed';
+
+  // "+ New" button toggles the create form
+  newBtn.addEventListener('click', () => {
+    createForm.style.display = '';
+    newBtn.style.display = 'none';
+    createInput.value = '';
+    setTimeout(() => createInput.focus(), 30);
+  });
+
+  // Cancel hides the form
+  cancelBtn.addEventListener('click', () => {
+    createForm.style.display = 'none';
+    newBtn.style.display = '';
+  });
+
+  // Status toggle
+  statusBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      statusBtns.forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      newChannelStatus = btn.dataset.status;
+    });
+  });
+
+  // Create channel
+  function doCreateChannel() {
+    const title = createInput.value.trim();
+    if (!title) return;
+
+    createBtn.disabled = true;
+    createBtn.textContent = '...';
+
+    chrome.runtime.sendMessage(
+      { action: 'createChannel', title, status: newChannelStatus },
+      (resp) => {
+        createBtn.disabled = false;
+        createBtn.textContent = 'Create';
+
+        if (resp && resp.success && resp.channel) {
+          const ch = resp.channel;
+          // Hide form, show button again
+          createForm.style.display = 'none';
+          newBtn.style.display = '';
+
+          // Upload to the new channel immediately
+          uploadFromDropdown(shadow, ch, imageDataUrl, sourceUrl);
+        } else {
+          // Show error inline
+          let statusEl = shadow.querySelector('.arena-upload-status');
+          if (!statusEl) {
+            statusEl = document.createElement('div');
+            statusEl.className = 'arena-upload-status';
+            dropdown.appendChild(statusEl);
+          }
+          statusEl.className = 'arena-upload-status error';
+          statusEl.textContent = (resp && resp.error) || 'Failed to create channel';
+        }
+      }
+    );
+  }
+
+  createBtn.addEventListener('click', doCreateChannel);
+  createInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      doCreateChannel();
+    }
+  });
 
   // Close button
   closeBtn.addEventListener('click', removeInlineDropdown);
