@@ -51,7 +51,7 @@
     }
   },
   "oauth2": {
-    "client_id": "G5ts-n6cBTO0e2fdbtRxLL30xdSRBHSI1X6uDL9OBO0",
+    "client_id": "YOUR_CLIENT_ID_HERE",
     "scopes": [
       "read",
       "write"

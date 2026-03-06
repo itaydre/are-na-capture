@@ -8,10 +8,11 @@ A Chrome extension that allows you to capture any HTML element from web pages as
 - **Multiple Activation Methods**:
   - Click the extension icon and press "Start Capture"
   - Right-click context menu option "Capture Element to Are.na"
-  - Keyboard shortcut: `Ctrl+Shift+C` (or `Cmd+Shift+C` on Mac)
+  - Keyboard shortcut: `Ctrl+Shift+S` (or `Cmd+Shift+S` on Mac)
 - **OAuth Authentication**: Secure authentication with your Are.na account
-- **Channel Selection**: Choose from your Are.na channels to upload captured elements
-- **High-Quality Capture**: Uses html2canvas for high-resolution element rendering
+- **Channel Selection**: Search and choose from your Are.na channels
+- **Channel Creation**: Create new channels directly from the extension with privacy controls (Open, Closed, Private)
+- **High-Quality Capture**: Uses Chrome's native screenshot API with device pixel ratio support
 
 ## Installation
 
@@ -21,37 +22,51 @@ Download or clone this repository to your local machine.
 
 ### 2. Register OAuth Application with Are.na
 
-Before using the extension, you need to register an OAuth application with Are.na:
-
 1. Go to [Are.na Developer Settings](https://www.are.na/settings/applications)
 2. Click "New Application" or "Create Application"
 3. Fill in the application details:
    - **Name**: Are.na Element Capture (or any name you prefer)
-   - **Redirect URI**: You'll need to get this after loading the extension (see step 4)
-4. Save the application and copy the **Client ID**
+   - **Redirect URI**: You'll get this after loading the extension (see step 5)
+4. Save the application and copy the **Client ID** and **Client Secret**
 
 ### 3. Configure the Extension
 
-1. Open the `manifest.json` file
-2. Find the `oauth2` section:
+1. Open `manifest.json`
+2. Find the `oauth2` section and replace `YOUR_CLIENT_ID_HERE` with your Client ID:
    ```json
    "oauth2": {
      "client_id": "YOUR_CLIENT_ID_HERE",
      "scopes": ["read", "write"]
    }
    ```
-3. Replace `YOUR_CLIENT_ID_HERE` with your actual Client ID from step 2
 
-### 4. Get Your Redirect URI
+### 4. Deploy the Proxy Server
 
-1. Load the extension in Chrome (see step 5)
-2. Open the browser console (F12) and run:
-   ```javascript
-   chrome.identity.getRedirectURL()
+The extension uses a backend proxy to securely exchange OAuth tokens (keeping your Client Secret server-side).
+
+**Option A: Deploy to Vercel (recommended)**
+
+1. Install the [Vercel CLI](https://vercel.com/docs/cli) and log in
+2. From the project root, run:
+   ```bash
+   vercel
    ```
-3. Copy the returned URL (it will look like `https://[extension-id].chromiumapp.org/`)
-4. Go back to your Are.na application settings and add this URL as a Redirect URI
-5. Save the application settings
+3. Set the `CLIENT_SECRET` environment variable in your Vercel project settings
+4. Update `PROXY_SERVER_URL` in `background.js` to your Vercel deployment URL
+
+**Option B: Run locally**
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Start the proxy server:
+   ```bash
+   CLIENT_SECRET=your_secret_here npm start
+   ```
+3. Update `PROXY_SERVER_URL` in `background.js` to `http://localhost:3000`
+
+See [PROXY_SETUP.md](PROXY_SETUP.md) for more deployment options.
 
 ### 5. Load the Extension in Chrome
 
@@ -59,19 +74,16 @@ Before using the extension, you need to register an OAuth application with Are.n
 2. Enable "Developer mode" (toggle in the top right)
 3. Click "Load unpacked"
 4. Select the `are-na-capture` directory
-5. The extension should now appear in your extensions list
 
-### 6. Create Extension Icons
+### 6. Set the Redirect URI
 
-The extension requires icon files. You can:
-
-- Create your own icons (16x16, 48x48, and 128x128 pixels) and save them as:
-  - `icons/icon16.png`
-  - `icons/icon48.png`
-  - `icons/icon128.png`
-
-Or use a simple placeholder:
-- Create a simple colored square image and save it in the three required sizes
+1. After loading the extension, open the browser console (F12 on the background service worker) and run:
+   ```javascript
+   chrome.identity.getRedirectURL()
+   ```
+2. Copy the returned URL (looks like `https://[extension-id].chromiumapp.org/`)
+3. Go back to your Are.na application settings and add this URL as the **Redirect URI**
+4. Save the application settings
 
 ## Usage
 
@@ -79,59 +91,60 @@ Or use a simple placeholder:
 
 1. Click the extension icon in your Chrome toolbar
 2. Click "Login to Are.na" to authenticate
-3. You'll be redirected to Are.na to authorize the application
-4. After authorization, you'll be redirected back and logged in
+3. Authorize the application on Are.na
+4. You'll be redirected back and logged in
 
 ### Capturing Elements
 
 1. Navigate to any webpage
-2. Activate capture mode using one of these methods:
+2. Activate capture mode:
    - Click the extension icon → "Start Capture"
-   - Right-click on the page → "Capture Element to Are.na"
-   - Press `Ctrl+Shift+C` (or `Cmd+Shift+C` on Mac)
+   - Right-click → "Capture Element to Are.na"
+   - Press `Ctrl+Shift+S` (`Cmd+Shift+S` on Mac)
 3. Hover over elements to see them highlighted
-4. Click on the element you want to capture
-5. The extension popup will open (or reopen if closed) with your captured element
-6. Select a channel from the dropdown
+4. Click the element you want to capture
+5. The popup opens with your captured element preview
+6. Select a channel (or create a new one with "+ New")
 7. Click "Upload to Are.na"
+
+### Creating Channels
+
+1. In the popup, click "+ New" next to "Recent channels"
+2. Enter a channel name
+3. Choose a privacy status: Closed, Open, or Private
+4. Click "Create"
+5. The new channel is auto-selected and ready for upload
 
 ### Tips
 
 - Press `ESC` while in capture mode to cancel
+- Use the search bar to quickly find channels
 - The captured image is a high-quality PNG
-- You can capture any HTML element, not just divs
-- The extension works on any website
+- Captures expire after 5 minutes — upload promptly
 
 ## Troubleshooting
 
 ### "OAuth client ID not configured" Error
-
 - Make sure you've replaced `YOUR_CLIENT_ID_HERE` in `manifest.json` with your actual Client ID
 - Reload the extension after making changes
 
-### "No authorization code received" Error
+### "Token exchange failed: Cannot connect to proxy server"
+- Verify your proxy server is running and accessible
+- Check that `PROXY_SERVER_URL` in `background.js` matches your deployment URL
+- Ensure `CLIENT_SECRET` is set in the proxy server environment
 
+### "No authorization code received" Error
 - Verify that your Redirect URI in Are.na matches exactly what `chrome.identity.getRedirectURL()` returns
-- Make sure there are no trailing slashes or extra characters
 
 ### "Failed to fetch channels" Error
-
 - Check your internet connection
-- Verify you're logged in (try logging out and back in)
-- Check that your OAuth application has the correct scopes (read, write)
+- Try logging out and back in
+- Check that your OAuth application has read and write scopes
 
 ### Capture Mode Not Starting
-
 - Refresh the page and try again
-- Some pages may block content scripts - try a different page
+- Some pages may block content scripts — try a different page
 - Check the browser console for errors (F12)
-
-### Image Not Uploading
-
-- Verify you've selected a channel
-- Check that the channel slug is correct
-- Try capturing a different element
-- Check the browser console for detailed error messages
 
 ## Development
 
@@ -139,54 +152,50 @@ Or use a simple placeholder:
 
 ```
 are-na-capture/
-├── manifest.json       # Extension configuration
-├── background.js       # Service worker (OAuth, API calls)
-├── content.js          # Element selection and capture
-├── popup.html          # Extension popup UI
-├── popup.js            # Popup logic
-├── styles.css          # Popup styling
-├── icons/              # Extension icons
-│   ├── icon16.png
-│   ├── icon48.png
-│   └── icon128.png
-└── README.md           # This file
+├── manifest.json          # Extension configuration
+├── background.js          # Service worker (OAuth, API calls)
+├── content.js             # Element selection and capture
+├── popup.html             # Extension popup UI
+├── popup.js               # Popup logic and state management
+├── styles.css             # Popup styling
+├── icons/                 # Extension icons (16, 48, 128px)
+├── proxy-server.js        # Local OAuth proxy server (Node.js)
+├── api/
+│   └── exchange-token.js  # Vercel serverless function for OAuth
+├── vercel.json            # Vercel deployment config
+└── README.md
 ```
 
 ### Making Changes
 
-After making any changes to the extension:
+After making changes to the extension:
 
 1. Go to `chrome://extensions/`
-2. Find the extension
-3. Click the reload icon (circular arrow)
-4. Test your changes
+2. Find the extension and click the reload icon
+3. Test your changes
 
-### API Endpoints Used
+### API
 
-- `GET /v2/channels` - Fetch user's channels
-- `POST /v2/channels/:slug/blocks` - Upload image block
+The extension uses Are.na API v3 with automatic v2 fallback. Key endpoints:
 
-See the [Are.na API Documentation](https://dev.are.na/documentation/channels) for more details.
+- `GET /v3/me` — Authenticated user info
+- `GET /v3/users/:slug/contents?type=Channel` — User's channels
+- `POST /v3/channels` — Create a new channel
+- `POST /v3/uploads/presign` — Get presigned S3 upload URL
+- `POST /v3/blocks` — Create a block in a channel
+- `GET /v3/search` — Search channels
+
+See the [Are.na API Documentation](https://dev.are.na/documentation) for details.
 
 ## Permissions
 
-The extension requires the following permissions:
-
-- `activeTab` - To interact with the current webpage
-- `storage` - To store authentication tokens
-- `identity` - For OAuth authentication
-- `contextMenus` - For right-click menu option
-- `scripting` - To inject content scripts
-- `https://api.are.na/*` - To communicate with Are.na API
-- `https://www.are.na/*` - For OAuth authentication
+- `activeTab` — Interact with the current webpage
+- `storage` — Store authentication tokens
+- `identity` — OAuth authentication flow
+- `contextMenus` — Right-click menu option
+- `scripting` — Inject content scripts
+- `tabs` — Access tab information for capture
 
 ## License
 
-This extension is provided as-is for personal use.
-
-## Support
-
-For issues or questions:
-- Check the [Are.na API Documentation](https://dev.are.na/documentation)
-- Review Chrome Extension documentation
-- Check browser console for error messages
+MIT
