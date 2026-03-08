@@ -390,8 +390,11 @@ header h1 {
   background: transparent;
   color: #666;
   border: 1px solid #e0e0e0;
-  padding: 5px 12px;
-  font-size: 12px;
+  padding: 4px;
+  line-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-cancel:hover {
@@ -400,8 +403,11 @@ header h1 {
 }
 
 .create-channel-actions .btn-primary {
-  padding: 5px 12px;
-  font-size: 12px;
+  padding: 4px;
+  line-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .channels-header-row {

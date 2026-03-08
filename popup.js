@@ -532,19 +532,11 @@ async function handleUpload() {
     
     if (response.success) {
       showMessage('Successfully uploaded to Are.na!', 'success');
-      
+
       // Clear stored capture
       chrome.storage.local.remove(['capturedImage', 'capturedElementInfo', 'capturedSourceUrl', 'captureTimestamp']);
-      
-      // Reset state
-      setTimeout(() => {
-        capturedImageDataUrl = null;
-        capturedSourceUrl = null;
-        previewSection.classList.add('hidden');
-        channelSection.classList.add('hidden');
-        uploadBtn.classList.add('hidden');
-        captureStatus.innerHTML = '<p>Click the camera icon to capture elements from the current page.</p>';
-      }, 2000);
+      capturedImageDataUrl = null;
+      capturedSourceUrl = null;
     } else {
       throw new Error(response.error || 'Upload failed');
     }
@@ -593,7 +585,7 @@ async function handleCreateChannel() {
   }
 
   confirmCreateChannel.disabled = true;
-  confirmCreateChannel.textContent = 'Creating...';
+  confirmCreateChannel.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="7" cy="7" r="5" stroke-dasharray="20" stroke-dashoffset="5"><animateTransform attributeName="transform" type="rotate" from="0 7 7" to="360 7 7" dur="0.8s" repeatCount="indefinite"/></circle></svg>';
 
   try {
     const response = await new Promise((resolve, reject) => {
@@ -628,7 +620,7 @@ async function handleCreateChannel() {
     showMessage(error.message || 'Failed to create channel.', 'error');
   } finally {
     confirmCreateChannel.disabled = false;
-    confirmCreateChannel.textContent = 'Create';
+    confirmCreateChannel.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2.5,7.5 5.5,10.5 11.5,3.5"/></svg>';
   }
 }
 
