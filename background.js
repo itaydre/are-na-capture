@@ -145,6 +145,17 @@ async function authenticate() {
         }
 
         chrome.storage.local.set(storageData);
+
+        // Track successful authentication
+        fetch(`${PROXY_SERVER_URL}/ping`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: 'auth',
+            extensionId: chrome.runtime.id
+          })
+        }).catch(() => {});
+
         isAuthenticating = false;
         resolve(accessToken);
       } catch (error) {
@@ -299,8 +310,8 @@ async function searchChannels(query) {
 
   // Try v3 first, then v2
   const urls = [
-    `${ARE_NA_API_BASE}/search?query=${encodeURIComponent(query)}&type=Channel&scope=my&per=20&sort=score_desc`,
-    `https://api.are.na/v2/search/channels?q=${encodeURIComponent(query)}&per=20`
+    `${ARE_NA_API_BASE}/search?query=${encodeURIComponent(query)}&type=Channel&scope=my&per=40&sort=score_desc`,
+    `https://api.are.na/v2/search/channels?q=${encodeURIComponent(query)}&per=40`
   ];
 
   for (const url of urls) {

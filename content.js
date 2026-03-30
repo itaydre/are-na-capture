@@ -6,6 +6,9 @@ let overlay = null;
 let dropdownHost = null;
 let clickPosition = null;
 let selectedChannel = null;
+let multiSelectElements = []; // Elements selected via shift+click
+let multiSelectOverlays = []; // Persistent highlight overlays for multi-selected elements
+let multiSelectStatusEl = null; // Status bar for multi-select mode
 
 // Listen for messages from background/popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -25,6 +28,10 @@ function startCaptureMode() {
   isCaptureMode = true;
   document.body.style.cursor = 'crosshair';
 
+  // Prevent text selection during capture mode (shift+click causes it)
+  document.body.style.userSelect = 'none';
+  document.body.style.webkitUserSelect = 'none';
+
   // Create overlay for highlighting
   overlay = document.createElement('div');
   overlay.id = 'arena-capture-overlay';
@@ -42,7 +49,12 @@ function startCaptureMode() {
   document.addEventListener('mousemove', handleMouseMove, true);
   document.addEventListener('click', handleClick, true);
   document.addEventListener('keydown', handleKeyDown, true);
+  document.addEventListener('selectstart', preventSelect, true);
 
+}
+
+function preventSelect(e) {
+  e.preventDefault();
 }
 
 function stopCaptureMode() {
@@ -50,6 +62,11 @@ function stopCaptureMode() {
 
   isCaptureMode = false;
   document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+  document.body.style.webkitUserSelect = '';
+
+  // Clear any accidental text selection
+  window.getSelection()?.removeAllRanges();
 
   // Remove overlay
   if (overlay) {
@@ -57,10 +74,14 @@ function stopCaptureMode() {
     overlay = null;
   }
 
+  // Remove multi-select overlays and status
+  clearMultiSelect();
+
   // Remove event listeners
   document.removeEventListener('mousemove', handleMouseMove, true);
   document.removeEventListener('click', handleClick, true);
   document.removeEventListener('keydown', handleKeyDown, true);
+  document.removeEventListener('selectstart', preventSelect, true);
 
   // Clear selection
   if (selectedElement) {
@@ -101,23 +122,203 @@ function handleClick(e) {
 
   const element = e.target;
 
-  // Don't select the overlay itself
-  if (element === overlay || element.id === 'arena-capture-overlay') {
+  // Don't select the overlay itself or multi-select UI
+  if (element === overlay || element.id === 'arena-capture-overlay' ||
+      element === multiSelectStatusEl || (multiSelectStatusEl && multiSelectStatusEl.contains(element))) {
     return;
   }
+  // Skip multi-select overlays
+  if (multiSelectOverlays.some(o => o === element)) return;
 
   // Save click position for the dropdown
   clickPosition = { x: e.clientX, y: e.clientY };
 
-  selectedElement = element;
-  captureElement(element);
+  if (e.shiftKey && multiSelectElements.length > 0) {
+    // Shift+click: add more elements to selection
+    addToMultiSelect(element);
+    return;
+  }
+
+  // Regular click (with or without shift): start fresh selection
+  clearMultiSelect();
+  addToMultiSelect(element);
+}
+
+function addToMultiSelect(element) {
+  // Don't add duplicates
+  if (multiSelectElements.includes(element)) return;
+
+  multiSelectElements.push(element);
+
+  // Create persistent highlight for this element
+  const rect = element.getBoundingClientRect();
+  const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+  const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+
+  const msOverlay = document.createElement('div');
+  msOverlay.className = 'arena-multiselect-overlay';
+  msOverlay.style.cssText = `
+    position: absolute;
+    pointer-events: none;
+    border: 2px solid #E24A8B;
+    background: rgba(226, 74, 139, 0.1);
+    z-index: 999998;
+    left: ${rect.left + scrollX}px;
+    top: ${rect.top + scrollY}px;
+    width: ${rect.width}px;
+    height: ${rect.height}px;
+  `;
+  document.body.appendChild(msOverlay);
+  multiSelectOverlays.push(msOverlay);
+
+  // Show/update status bar
+  updateMultiSelectStatus();
+}
+
+function updateMultiSelectStatus() {
+  if (!multiSelectStatusEl) {
+    multiSelectStatusEl = document.createElement('div');
+    multiSelectStatusEl.id = 'arena-multiselect-status';
+    multiSelectStatusEl.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      z-index: 2147483647;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    `;
+    document.body.appendChild(multiSelectStatusEl);
+  }
+
+  const count = multiSelectElements.length;
+  multiSelectStatusEl.innerHTML = `
+    <span>${count} element${count > 1 ? 's' : ''} selected</span>
+    <span style="opacity: 0.6; font-size: 11px;">Shift+click to add more \u00B7 Enter to capture \u00B7 Click to reselect \u00B7 Esc to cancel</span>
+  `;
+}
+
+function clearMultiSelect() {
+  multiSelectElements = [];
+  multiSelectOverlays.forEach(o => o.remove());
+  multiSelectOverlays = [];
+  if (multiSelectStatusEl) {
+    multiSelectStatusEl.remove();
+    multiSelectStatusEl = null;
+  }
+}
+
+function captureMultiSelect() {
+  if (multiSelectElements.length === 0) return;
+
+  // Compute combined bounding rect from current element positions
+  const scrollX = window.scrollX || window.pageXOffset;
+  const scrollY = window.scrollY || window.pageYOffset;
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+  for (const el of multiSelectElements) {
+    const rect = el.getBoundingClientRect();
+    const absLeft = rect.left + scrollX;
+    const absTop = rect.top + scrollY;
+    minX = Math.min(minX, absLeft);
+    minY = Math.min(minY, absTop);
+    maxX = Math.max(maxX, absLeft + rect.width);
+    maxY = Math.max(maxY, absTop + rect.height);
+  }
+
+  const combinedInfo = {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+    tagName: 'MULTI',
+    className: '',
+    id: ''
+  };
+
+  // Remove multi-select overlays and status before capture
+  clearMultiSelect();
+
+  // Remove hover overlay
+  if (overlay) {
+    overlay.remove();
+    overlay = null;
+  }
+
+  // Force repaint then capture — reuse the same flow as captureElement
+  document.body.offsetHeight;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        // Fully stop capture mode (removes listeners, resets state)
+        isCaptureMode = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.body.style.webkitUserSelect = '';
+        window.getSelection()?.removeAllRanges();
+        document.removeEventListener('mousemove', handleMouseMove, true);
+        document.removeEventListener('click', handleClick, true);
+        document.removeEventListener('keydown', handleKeyDown, true);
+        document.removeEventListener('selectstart', preventSelect, true);
+        selectedElement = null;
+
+        chrome.runtime.sendMessage({
+          action: 'captureElement',
+          elementInfo: combinedInfo
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.error('Capture error:', chrome.runtime.lastError.message);
+            return;
+          }
+
+          if (response && response.error) {
+            console.error('Capture error:', response.error);
+            return;
+          }
+
+          if (response && response.imageDataUrl) {
+            const sourceUrl = window.location.href;
+
+            chrome.storage.local.set({
+              capturedImage: response.imageDataUrl,
+              capturedElementInfo: combinedInfo,
+              capturedSourceUrl: sourceUrl,
+              capturedPageTitle: document.title || new URL(sourceUrl).hostname,
+              captureTimestamp: Date.now()
+            });
+
+            showInlineDropdown(response.imageDataUrl, sourceUrl);
+          }
+        });
+      }, 100);
+    });
+  });
 }
 
 function handleKeyDown(e) {
   if (!isCaptureMode) return;
 
   if (e.key === 'Escape') {
+    if (multiSelectElements.length > 0) {
+      // Cancel multi-select but stay in capture mode
+      clearMultiSelect();
+      return;
+    }
     stopCaptureMode();
+  }
+
+  if (e.key === 'Enter' && multiSelectElements.length > 0) {
+    e.preventDefault();
+    captureMultiSelect();
   }
 }
 
@@ -178,6 +379,7 @@ async function captureElement(element) {
           capturedImage: response.imageDataUrl,
           capturedElementInfo: elementInfo,
           capturedSourceUrl: sourceUrl,
+          capturedPageTitle: document.title || new URL(sourceUrl).hostname,
           captureTimestamp: Date.now()
         });
 
@@ -729,6 +931,7 @@ function showInlineDropdown(imageDataUrl, sourceUrl) {
   const statusBtns = shadow.querySelectorAll('.arena-status-btn');
   const connectFooter = shadow.querySelector('.arena-connect-footer');
   const titleInput = shadow.querySelector('.arena-title-input');
+  titleInput.value = document.title || new URL(sourceUrl).hostname;
   const connectBtn = shadow.querySelector('.arena-connect-btn');
   let newChannelStatus = 'closed';
   selectedChannel = null;
@@ -878,6 +1081,13 @@ function showInlineDropdown(imageDataUrl, sourceUrl) {
     loadDropdownChannels(shadow, imageDataUrl, sourceUrl, '');
   });
 
+  // Prevent keyboard events from reaching the host page (e.g. GitHub's "T" shortcut)
+  for (const input of shadow.querySelectorAll('input')) {
+    for (const evt of ['keydown', 'keyup', 'keypress']) {
+      input.addEventListener(evt, (e) => e.stopPropagation());
+    }
+  }
+
   // Search handler with debounce
   let searchTimer = null;
   searchInput.addEventListener('input', () => {
@@ -899,11 +1109,20 @@ function loadDropdownChannels(shadow, imageDataUrl, sourceUrl, query) {
   channelList.innerHTML = '<li class="arena-loading"><span class="arena-spinner"></span> Loading...</li>';
 
   if (query) {
-    // Search mode
+    // Search mode — fetch all user channels and filter locally to ensure complete results
     recentLabel.textContent = 'Results';
-    chrome.runtime.sendMessage({ action: 'searchChannels', query }, (resp) => {
-      if (resp && resp.success && resp.channels && resp.channels.length > 0) {
-        renderDropdownChannels(shadow, resp.channels, imageDataUrl, sourceUrl);
+    chrome.runtime.sendMessage({ action: 'getChannels', fetchAll: true }, (resp) => {
+      if (resp && resp.success && resp.channels) {
+        const term = query.toLowerCase();
+        const filtered = resp.channels.filter(c =>
+          (c.title || '').toLowerCase().includes(term) ||
+          (c.slug || '').toLowerCase().includes(term)
+        );
+        if (filtered.length > 0) {
+          renderDropdownChannels(shadow, filtered.slice(0, 20), imageDataUrl, sourceUrl);
+        } else {
+          channelList.innerHTML = '<li class="arena-empty">No channels found</li>';
+        }
       } else {
         channelList.innerHTML = '<li class="arena-empty">No channels found</li>';
       }
@@ -1028,7 +1247,7 @@ function uploadFromDropdown(shadow, channel, imageDataUrl, sourceUrl, title) {
       trackRecentChannel(channel);
 
       // Clear stored capture
-      chrome.storage.local.remove(['capturedImage', 'capturedElementInfo', 'capturedSourceUrl', 'captureTimestamp']);
+      chrome.storage.local.remove(['capturedImage', 'capturedElementInfo', 'capturedSourceUrl', 'capturedPageTitle', 'captureTimestamp']);
 
       // Auto-close after a beat
       setTimeout(removeInlineDropdown, 1200);

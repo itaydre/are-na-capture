@@ -2,6 +2,7 @@
 
 let capturedImageDataUrl = null;
 let capturedSourceUrl = null;
+let capturedPageTitle = null;
 let channels = [];
 let displayedChannels = []; // Currently displayed list (may differ from channels during search)
 let allChannelsLoaded = false;
@@ -225,10 +226,11 @@ function handleResetCapture() {
   // Clear captured image data
   capturedImageDataUrl = null;
   capturedSourceUrl = null;
+  capturedPageTitle = null;
   selectedChannelSlug = null;
 
   // Clear stored capture from storage
-  chrome.storage.local.remove(['capturedImage', 'capturedElementInfo', 'capturedSourceUrl', 'captureTimestamp']);
+  chrome.storage.local.remove(['capturedImage', 'capturedElementInfo', 'capturedSourceUrl', 'capturedPageTitle', 'captureTimestamp']);
 
   // Hide preview section
   previewSection.classList.add('hidden');
@@ -267,7 +269,7 @@ function handleElementCaptured(imageDataUrl, elementInfo, sourceUrl) {
 // Returns true if a captured image was found and displayed
 async function checkForCapturedImage() {
   try {
-    const result = await chrome.storage.local.get(['capturedImage', 'capturedElementInfo', 'capturedSourceUrl', 'captureTimestamp']);
+    const result = await chrome.storage.local.get(['capturedImage', 'capturedElementInfo', 'capturedSourceUrl', 'capturedPageTitle', 'captureTimestamp']);
     console.log('Checking for captured image:', {
       hasImage: !!result.capturedImage,
       hasSourceUrl: !!result.capturedSourceUrl,
@@ -284,12 +286,13 @@ async function checkForCapturedImage() {
         // Show main section first so image can be displayed
         showMainSection();
         // Show the captured image regardless of auth status
+        capturedPageTitle = result.capturedPageTitle || null;
         handleElementCaptured(result.capturedImage, result.capturedElementInfo || {}, result.capturedSourceUrl);
         return true; // Image was found and shown
       } else {
         console.log('Capture too old, clearing');
         // Clear old capture
-        chrome.storage.local.remove(['capturedImage', 'capturedElementInfo', 'capturedSourceUrl', 'captureTimestamp']);
+        chrome.storage.local.remove(['capturedImage', 'capturedElementInfo', 'capturedSourceUrl', 'capturedPageTitle', 'captureTimestamp']);
         return false;
       }
     } else {
@@ -527,16 +530,18 @@ async function handleUpload() {
       action: 'uploadBlock',
       channelSlug: channelSlug,
       imageDataUrl: capturedImageDataUrl,
-      sourceUrl: capturedSourceUrl
+      sourceUrl: capturedSourceUrl,
+      title: capturedPageTitle || undefined
     });
     
     if (response.success) {
       showMessage('Successfully uploaded to Are.na!', 'success');
 
       // Clear stored capture
-      chrome.storage.local.remove(['capturedImage', 'capturedElementInfo', 'capturedSourceUrl', 'captureTimestamp']);
+      chrome.storage.local.remove(['capturedImage', 'capturedElementInfo', 'capturedSourceUrl', 'capturedPageTitle', 'captureTimestamp']);
       capturedImageDataUrl = null;
       capturedSourceUrl = null;
+      capturedPageTitle = null;
     } else {
       throw new Error(response.error || 'Upload failed');
     }
