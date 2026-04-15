@@ -4,33 +4,43 @@
 const ARE_NA_API_BASE = 'https://api.are.na/v3';
 const ARE_NA_AUTH_URL = 'https://www.are.na/oauth/authorize';
 
-// Backend proxy server URL for OAuth token exchange
-const PROXY_SERVER_URL = 'https://are-na-capture.vercel.app';
-
 // Auth state to prevent multiple simultaneous auth windows
 let isAuthenticating = false;
 let authPromise = null;
 
 // Initialize context menu on install
-chrome.runtime.onInstalled.addListener((details) => {
+chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: 'capture-element',
     title: 'Capture Element to Are.na',
     contexts: ['page', 'selection']
   });
-
-  // Track install/update
-  if (details.reason === 'install' || details.reason === 'update') {
-    fetch(`${PROXY_SERVER_URL}/ping`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        event: details.reason,
-        extensionId: chrome.runtime.id
-      })
-    }).catch(() => {});
-  }
 });
+
+function base64UrlEncode(bytes) {
+  let binary = '';
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+async function sha256(input) {
+  const data = new TextEncoder().encode(input);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return new Uint8Array(hashBuffer);
+}
+
+async function generatePkcePair() {
+  const randomBytes = crypto.getRandomValues(new Uint8Array(32));
+  const verifier = base64UrlEncode(randomBytes);
+  const challenge = base64UrlEncode(await sha256(verifier));
+  return { verifier, challenge };
+}
 
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener((info, tab) => {
@@ -90,7 +100,8 @@ async function authenticate() {
       }
 
       const redirectUri = chrome.identity.getRedirectURL();
-      const authUrl = `${ARE_NA_AUTH_URL}?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=read+write`;
+      const { verifier, challenge } = await generatePkcePair();
+      const authUrl = `${ARE_NA_AUTH_URL}?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=read+write&code_challenge=${encodeURIComponent(challenge)}&code_challenge_method=S256`;
 
       try {
         const responseUrl = await chrome.identity.launchWebAuthFlow({
@@ -107,13 +118,18 @@ async function authenticate() {
           return;
         }
 
-        const tokenResponse = await fetch(`${PROXY_SERVER_URL}/exchange-token`, {
+        const tokenResponse = await fetch('https://api.are.na/v3/oauth/token', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           body: JSON.stringify({
+            grant_type: 'authorization_code',
             code: code,
             client_id: clientId,
-            redirect_uri: redirectUri
+            redirect_uri: redirectUri,
+            code_verifier: verifier
           })
         });
 
@@ -125,10 +141,6 @@ async function authenticate() {
             errorMessage = `Token exchange failed: ${errorJson.error_description || errorJson.error || errorText}`;
           } catch (e) {
             errorMessage = `Token exchange failed: ${errorText}`;
-          }
-
-          if (tokenResponse.status === 0 || tokenResponse.status === 500) {
-            errorMessage = `Token exchange failed: Cannot connect to proxy server at ${PROXY_SERVER_URL}`;
           }
 
           isAuthenticating = false;
@@ -145,16 +157,6 @@ async function authenticate() {
         }
 
         chrome.storage.local.set(storageData);
-
-        // Track successful authentication
-        fetch(`${PROXY_SERVER_URL}/ping`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            event: 'auth',
-            extensionId: chrome.runtime.id
-          })
-        }).catch(() => {});
 
         isAuthenticating = false;
         resolve(accessToken);
